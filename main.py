@@ -1,5 +1,5 @@
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import openai
 import os
@@ -241,6 +241,16 @@ def create_presentation(slide_structure: list, template_path: Path, output_path:
 @app.get("/")
 async def root():
     return {"message": "Text to PowerPoint Generator API"}
+
+@app.get("/index.html")
+async def serve_frontend():
+    """Serve the frontend HTML file"""
+    try:
+        with open("index.html", "r", encoding="utf-8") as f:
+            html_content = f.read()
+        return HTMLResponse(content=html_content)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Frontend not found")
 
 @app.get("/health")
 async def health_check():
