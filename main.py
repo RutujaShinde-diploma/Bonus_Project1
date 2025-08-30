@@ -80,6 +80,10 @@ async def generate_slide_structure(text: str, guidance: str, api_key: str, provi
     """
     if provider.lower() == "openai":
         return await generate_with_openai(text, guidance, api_key)
+    elif provider.lower() == "anthropic":
+        return await generate_with_anthropic(text, guidance, api_key)
+    elif provider.lower() == "gemini":
+        return await generate_with_gemini(text, guidance, api_key)
     else:
         # Default to OpenAI for now
         return await generate_with_openai(text, guidance, api_key)
@@ -143,6 +147,132 @@ async def generate_with_openai(text: str, guidance: str, api_key: str) -> list:
             
     except Exception as e:
         print(f"OpenAI API error: {e}")
+        return create_fallback_structure(text)
+
+async def generate_with_anthropic(text: str, guidance: str, api_key: str) -> list:
+    """
+    Generate slide structure using Anthropic Claude API
+    """
+    try:
+        import anthropic
+        
+        client = anthropic.Anthropic(api_key=api_key)
+        
+        prompt = f"""
+        Convert the following text into a PowerPoint presentation structure.
+        
+        Guidance: {guidance if guidance else 'Create a professional presentation'}
+        
+        Text: {text}
+        
+        Generate a JSON array of slides. Each slide should have:
+        - title: slide title
+        - content: array of bullet points or content
+        
+        Example format:
+        [
+            {{
+                "title": "Introduction",
+                "content": ["Welcome", "Agenda", "Key Objectives"]
+            }},
+            {{
+                "title": "Main Content",
+                "content": ["Point 1", "Point 2", "Point 3"]
+            }}
+        ]
+        
+        Create 3-8 slides based on the content. Make titles concise and content clear.
+        Return only valid JSON, no other text.
+        """
+        
+        response = client.messages.create(
+            model="claude-3-sonnet-20240229",
+            max_tokens=1000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        content = response.content[0].text.strip()
+        
+        # Try to extract JSON from response
+        try:
+            # Remove any markdown formatting
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.endswith("```"):
+                content = content[:-3]
+            
+            slide_structure = json.loads(content.strip())
+            return slide_structure
+        except json.JSONDecodeError:
+            # Fallback: create simple structure
+            return create_fallback_structure(text)
+            
+    except ImportError:
+        print("Anthropic library not installed, falling back to OpenAI")
+        return await generate_with_openai(text, guidance, api_key)
+    except Exception as e:
+        print(f"Anthropic API error: {e}")
+        return create_fallback_structure(text)
+
+async def generate_with_gemini(text: str, guidance: str, api_key: str) -> list:
+    """
+    Generate slide structure using Google Gemini API
+    """
+    try:
+        import google.generativeai as genai
+        
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-pro')
+        
+        prompt = f"""
+        Convert the following text into a PowerPoint presentation structure.
+        
+        Guidance: {guidance if guidance else 'Create a professional presentation'}
+        
+        Text: {text}
+        
+        Generate a JSON array of slides. Each slide should have:
+        - title: slide title
+        - content: array of bullet points or content
+        
+        Example format:
+        [
+            {{
+                "title": "Introduction",
+                "content": ["Welcome", "Agenda", "Key Objectives"]
+            }},
+            {{
+                "title": "Main Content",
+                "content": ["Point 1", "Point 2", "Point 3"]
+            }}
+        ]
+        
+        Create 3-8 slides based on the content. Make titles concise and content clear.
+        Return only valid JSON, no other text.
+        """
+        
+        response = model.generate_content(prompt)
+        content = response.text.strip()
+        
+        # Try to extract JSON from response
+        try:
+            # Remove any markdown formatting
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.endswith("```"):
+                content = content[:-3]
+            
+            slide_structure = json.loads(content.strip())
+            return slide_structure
+        except json.JSONDecodeError:
+            # Fallback: create simple structure
+            return create_fallback_structure(text)
+            
+    except ImportError:
+        print("Google Generative AI library not installed, falling back to OpenAI")
+        return await generate_with_openai(text, guidance, api_key)
+    except Exception as e:
+        print(f"Gemini API error: {e}")
         return create_fallback_structure(text)
 
 def create_fallback_structure(text: str) -> list:
